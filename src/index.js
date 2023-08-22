@@ -1,49 +1,45 @@
-import xlsx from 'exceljs'
+import xlsx from 'xlsx'
 import axios from 'axios'
+import path from 'path'
+import fs from 'fs'
 
-const workbook = new xlsx.Workbook();
+const filePath = path.resolve("image-list.xlsx");
+(async () => {
+    const wb = xlsx.readFile(filePath);
+    const ws = wb.Sheets['Planilha2'];
 
-workbook.xlsx.readFile('image-list.xlsx').then(async () => {
-    const worksheet = workbook.getWorksheet('Planilha2');
-    const imageCol = worksheet.getColumn('G');
-    const cells = imageCol.values;
+    const rows = xlsx.utils.sheet_to_json(ws);
 
-    let statusCodes = [];
+    let newRows = [];
 
-    await Promise.all(cells.map(async (cell, i, arr) => {
-        if (i < 800) {
-            return;
-        }
-        const link = cell.result;
+    for (let i = 0; i < rows.length; i++) {
+        newRows[i] = rows[i];
 
-        const responseStatus = (await axios.get(link).catch((e) => void(0)))?.status;
+        const row = rows[i];
+        const link = row.Coluna2;
 
-        if (responseStatus == undefined) statusCodes.push(404);
-        else statusCodes.push(responseStatus);
-        
-    }));
+        try {
+            const status = (await axios.get(link)).status;
+            newRows[i].Existe = "SIM"
+        } catch (err) {
+            const sku = row.Sku;
+            const imagePath = path.resolve("..", "images", `${sku}.png`);
+            const newImagePath = path.resolve("..", "lacking", `${sku}.png`);
 
-    const lacking = [];
-
-    imageCol.eachCell((cell, row) => {
-
-        if (row < 800) {
-            return;
-        } else {
-    
-            if (statusCodes[row - 800] == 200) {
-                console.log("Colorindo com a cor certa.") 
-                cell.fill = {
-                    type: 'pattern',
-                    pattern: 'solid',
-                    fgColor: { argb: 'FF98FB98' }
-                }
-            } else {
-                lacking.push()
+            if (fs.existsSync(imagePath)) {
+                console.log("\x1B[32mImagem existe e está no diretório de imagens => " + `${imagePath}\x1b[0m`);
+                fs.copyFileSync(imagePath, newImagePath);
+                newRows[i].Existe = "SIM"
             }
-
+            else {
+                console.log("\x1b[31mA imagem faltando não está no diretório de imagens => " + imagePath + "\x1b[0m");
+                newRows[i].Existe = "NÃO"
+            }
         }
-    })
+    }
+    const newSheet = xlsx.utils.json_to_sheet(newRows);
+    const workBoork = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workBoork, newSheet);
 
-    await workbook.xlsx.writeFile('test.xlsx')
-})
+    xlsx.writeFile(workBoork, "updated-list.xlsx");
+})()
