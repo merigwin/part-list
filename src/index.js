@@ -41,5 +41,7 @@ const filePath = path.resolve("image-list.xlsx");
     const workBoork = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(workBoork, newSheet);
 
-    xlsx.writeFile(workBoork, "updated-list.xlsx");
+    const filePath = path.resolve("updated-list.xlsx");
+
+    xlsx.writeFile(workBoork, filePath);
 })()
